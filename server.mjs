@@ -1,37 +1,30 @@
 import { createServer } from 'node:http';
 import { Router } from './router.mjs';
+import { customRequest } from './custom-request.mjs';
+import { customResponse } from './custom-response.mjs';
 
 const router = new Router();
 
 router.get('/', (req, res) => {
-  res.end('GET - Home');
+  res.status(200).end('GET - Home');
 });
 
 router.get('/products', (req, res) => {
-  res.end('GET - Products');
+  res.status(200).end('GET - Products');
 });
 
 router.post('/product', (req, res) => {
-  res.end('POST - Product');
+  const color = req.query.get('color');
+  res.status(201).json({ name: 'Notebook', color, price: 5999.99 });
 });
 
-const server = createServer(async (req, res) => {
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  const url = new URL(req.url || '/', 'http://localhost');
-  const handler = router.find(req.method, url.pathname);
+const server = createServer(async (request, response) => {
+  const req = await customRequest(request);
+  const res = customResponse(response);
+  const handler = router.find(req.method, req.pathname);
 
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const body = Buffer.concat(chunks).toString('utf-8');
-  console.log(JSON.parse(body));
-
-  if (handler) {
-    res.statusCode = 200;
-    handler(req, res);
-  } else {
-    res.statusCode = 404;
-    res.end('404');
-  }
+  if (handler) handler(req, res);
+  else res.status(404).end('not-found');
 });
 
 server.listen(3000, () => {
