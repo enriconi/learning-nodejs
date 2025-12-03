@@ -2,20 +2,48 @@ import { createServer } from 'node:http';
 import { Router } from './router.mjs';
 import { customRequest } from './custom-request.mjs';
 import { customResponse } from './custom-response.mjs';
+import fs from 'node:fs/promises';
 
 const router = new Router();
 
-router.get('/', (req, res) => {
-  res.status(200).end('GET - Home');
+router.post('/product', async (req, res) => {
+  const { name, slug, category, price } = req.body;
+  try {
+    await fs.mkdir(`./products/${category}`, { recursive: true });
+    await fs.writeFile(
+      `./products/${category}/${slug}.json`,
+      JSON.stringify({ name, slug, category, price }),
+    );
+  } catch (error) {
+    console.error('Folder exists.', error);
+  }
+
+  res.status(201).json({ name, slug, category, price });
 });
 
-router.get('/products', (req, res) => {
-  res.status(200).end('GET - Products');
+router.get('/products', async (req, res) => {
+  const productsDir = await fs.readdir('./products', { recursive: true });
+  const jsonFiles = productsDir.filter((file) => file.endsWith('.json'));
+
+  const products = await Promise.all(
+    jsonFiles.map(async (file) => {
+      const data = await fs.readFile(`./products/${file}`, 'utf-8');
+      return JSON.parse(data);
+    }),
+  );
+
+  res.status(200).json(products);
 });
 
-router.post('/product', (req, res) => {
-  const color = req.query.get('color');
-  res.status(201).json({ name: 'Notebook', color, price: 5999.99 });
+router.get('/product', async (req, res) => {
+  const category = req.query.get('category');
+  const slug = req.query.get('slug');
+  const data = await fs.readFile(
+    `./products/${category}/${slug}.json`,
+    'utf-8',
+  );
+
+  res.status(200).json(data);
 });
 
 const server = createServer(async (request, response) => {
